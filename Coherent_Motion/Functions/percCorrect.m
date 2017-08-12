@@ -1,0 +1,283 @@
+function [respOnly, avgCorrectDir, avgCorrectAxis, percIndiv, avgCorrectPairs, avgCorrectLabels, numNansVec] = percCorrect(rawData,curShifts,direction,expType)
+
+%   Description:    Take four-direction button-press data and return
+%                   percentages correct for each condition, checked against 1) all
+%                   directions and 2) "axis" pairings (true axes & null combinations). 
+%
+%   Syntax:         [avgCorrectDir, avgCorrectAxis, percIndiv, percAxIndiv, numNansVec] = percCorrect(rawData,shifts)
+%
+%   In:
+%       rawData:    n x 3 array double; Column 1 contains condition number,
+%                   Column 2 contains response (either 1, 2, 4, 5, or NaN), Column 3
+%                   contains trial timing.
+%       
+%       shifts:     1 x c vector double containing all shift distances.
+%
+%       direction:  'cardinal' | 'diagonal'; optional. Indicates direction of movement.
+%
+%       expType:    'EEG' | 'psychophysics'. Indicates type of experiment
+%                   so correct number of conditions is used.
+%
+%   Out:
+%       respOnly:       Column vector double with all responses, sorted in order
+%                       of condition and trial.
+%
+%       avgCorrectDir:  1 x c vector double with percentages of correct
+%                       responses for each shift distance, based on all 4 directions.
+%
+%       avgCorrectAxis: 1 x c vector double with percentages of correct
+%                       responses for each shift distance, based on the axes.
+%
+%       percIndiv:      4 x c array double with percentages of correct
+%                       responses for each shift distance based on all 4 directions, split 
+%                       into rows for the 4 directions. Row 1 for right, Row 2 for up, Row
+%                       3 for left, Row 4 for down.
+%
+%       avgCorrectPairs: 2 x c array double with percentages of correct
+%                       responses for each "axis" pairing (true axes, all other summed
+%                       possibilities).
+%
+%       avgCorrectLabels: Cell vector with strings denoting text labels for
+%                       each row in avgCorrectPairs.
+%
+%       numNansVec:     1 x 4*c vector double with number of NaNs for each
+%                       unique combination of shift distance and shift direction. 
+
+    % setting defaults
+    if nargin < 4
+        expType = 'psychophysics';
+    end
+    
+    if nargin < 3
+        direction = 'diagonal';
+    end
+    
+    % defining & pre-allocating variables
+    numShift = length(curShifts);
+    numTrials = length(rawData)/(numShift*4);
+    sortedCond = sortrows(rawData,1);
+    respOnly = sortedCond(:,2);
+    x = reshape(respOnly,numTrials,numShift,4);
+
+    corNE = zeros(1,numShift);
+    corNW = zeros(1,numShift);
+    corSW = zeros(1,numShift);
+    corSE = zeros(1,numShift);
+    corAxisNESW = zeros(1,numShift);
+    corAxisNWSE = zeros(1,numShift);
+
+    corAxisNENW = zeros(1,numShift);
+    corAxisNESE = zeros(1,numShift);
+    corAxisNWSW = zeros(1,numShift);
+    corAxisSESW = zeros(1,numShift);
+
+    numNans = zeros(4,numShift);
+
+    % number of correct & invalid responses per direction and axis pairing
+    for c = 1:numShift 
+        for t = 1:numTrials
+            if x(t,c,1) == 5 % NORTHEAST
+                corNE(c) = corNE(c)+1;
+                corAxisNESW(c) = corAxisNESW(c)+1;
+                corAxisNENW(c) = corAxisNENW(c)+1;
+                corAxisNESE(c) = corAxisNESE(c)+1;
+            elseif x(t,c,1) == 1
+                corAxisNESW(c) = corAxisNESW(c)+1;
+            elseif x(t,c,1) == 4
+                corAxisNENW(c) = corAxisNENW(c)+1;
+            else
+                corAxisNESE(c) = corAxisNESE(c)+1;
+            end
+
+            if x(t,c,2) == 4 % NORTHWEST
+                corNW(c) = corNW(c)+1;
+                corAxisNWSE(c) = corAxisNWSE(c)+1;
+                corAxisNWSW(c) = corAxisNWSW(c)+1;
+                corAxisNENW(c) = corAxisNENW(c)+1;
+            elseif x(t,c,2) == 2
+                corAxisNWSE(c) = corAxisNWSE(c)+1;
+            elseif x(t,c,2) == 1
+                corAxisNWSW(c) = corAxisNWSW(c)+1;
+            elseif x(t,c,2) == 5
+                corAxisNENW(c) = corAxisNENW(c)+1;
+            end
+
+            if x(t,c,3) == 1 % SOUTHWEST
+                corSW(c) = corSW(c)+1;
+                corAxisNESW(c) = corAxisNESW(c)+1;
+                corAxisNWSW(c) = corAxisNWSW(c)+1;
+                corAxisSESW(c) = corAxisSESW(c)+1;
+            elseif x(t,c,3) == 5
+                corAxisNESW(c) = corAxisNESW(c)+1;
+            elseif x(t,c,3) == 4
+                corAxisNWSW(c) = corAxisNWSW(c)+1;
+            elseif x(t,c,3) == 2
+                corAxisSESW(c) = corAxisSESW(c)+1;
+            end
+
+            if x(t,c,4) == 2 % SOUTHEAST
+                corSE(c) = corSE(c)+1;
+                corAxisNWSE(c) = corAxisNWSE(c)+1;
+                corAxisNESE(c) = corAxisNESE(c)+1;
+                corAxisSESW(c) = corAxisSESW(c)+1;
+            elseif x(t,c,4) == 4
+                corAxisNWSE(c) = corAxisNWSE(c)+1;
+            elseif x(t,c,4) == 5
+                corAxisNESE(c) = corAxisNESE(c)+1;
+            elseif x(t,c,4) == 1
+                corAxisSESW(c) = corAxisSESW(c)+1;
+            end
+            for d = 1:4
+                if isnan(x(t,c,d))
+                    numNans(d,c) = numNans(d,c)+1;
+                end
+            end
+        end               
+    end
+
+    tempNans = numNans';
+    numNansVec = reshape(tempNans,1,size(numNans,1)*size(numNans,2));
+
+    % converting raw numbers into percentages
+    percNE = corNE./(ones(1,numShift)*numTrials-numNans(1,:));
+    percNW = corNW./(ones(1,numShift)*numTrials-numNans(2,:));
+    percSW = corSW./(ones(1,numShift)*numTrials-numNans(3,:));
+    percSE = corSE./(ones(1,numShift)*numTrials-numNans(4,:));
+
+    percIndiv(1,:) = percNE;
+    percIndiv(2,:) = percNW;
+    percIndiv(3,:) = percSW;
+    percIndiv(4,:) = percSE;
+
+    percNESW = corAxisNESW./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(3,:)));
+    percNWSE = corAxisNWSE./(ones(1,numShift)*numTrials*2-(numNans(2,:)+numNans(4,:)));
+    percNENW = corAxisNENW./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(2,:)));
+    percNESE = corAxisNESE./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(4,:)));
+    percNWSW = corAxisNWSW./(ones(1,numShift)*numTrials*2-(numNans(2,:)+numNans(3,:)));
+    percSESW = corAxisSESW./(ones(1,numShift)*numTrials*2-(numNans(4,:)+numNans(3,:)));
+
+    avgCorrectDir = (percNE+percNW+percSW+percSE)/4;
+    avgCorrectAxis = (percNESW+percNWSE)/2;
+    avgCorrectL1 = (percNENW+percSESW)/2;
+    avgCorrectL2 = (percNWSW+percNESE)/2;
+    avgCorrectNull = (avgCorrectL1+avgCorrectL2)/2;
+
+    % if participant did not do full version with 9 displacement distances
+    % (only relevant for BH's data)
+    if length(curShifts) < 9 && strcmp(expType,'psychophysics')
+        avgCorrectDir = [avgCorrectDir,NaN];
+        avgCorrectAxis = [avgCorrectAxis,NaN];
+        avgCorrectNull = [avgCorrectNull,NaN];
+    end
+
+    % putting "axis" results all together
+    avgCorrectPairs = [avgCorrectAxis;avgCorrectNull];
+    avgCorrectLabels = {'X','null'};
+           
+%% OLDER CODE from non-diagonal (cardinal) axes
+
+%   PREALLOCATION
+%     if strcmp(direction,'cardinal')
+%         corRight = zeros(1,numShift);
+%         corUp = zeros(1,numShift);
+%         corLeft = zeros(1,numShift);
+%         corDown = zeros(1,numShift);
+%         corAxisLR = zeros(1,numShift);
+%         corAxisUD = zeros(1,numShift);
+%         
+%         corAxisRU = zeros(1,numShift);
+%         corAxisRD = zeros(1,numShift);
+%         corAxisLU = zeros(1,numShift);
+%         corAxisLD = zeros(1,numShift);
+%     else
+
+%   NUMBER CORRECT PER DIRECTION
+%     if strcmp(direction,'cardinal')
+%         if x(t,c,1) == 3 % RIGHT
+%             corRight(c) = corRight(c)+1; 
+%             corAxisLR(c) = corAxisLR(c)+1;
+%             corAxisRU(c) = corAxisRU(c)+1;
+%             corAxisRD(c) = corAxisRD(c)+1;
+%         elseif x(t,c,1) == 1
+%             corAxisLR(c) = corAxisLR(c)+1;
+%         elseif x(t,c,1) == 5
+%             corAxisRU(c) = corAxisRU(c)+1;
+%         elseif x(t,c,1) == 2
+%             corAxisRD(c) = corAxisRD(c)+1;
+%         end
+% 
+%         if x(t,c,2) == 5 % UP
+%             corUp(c) = corUp(c)+1;
+%             corAxisUD(c) = corAxisUD(c)+1;
+%             corAxisRU(c) = corAxisRU(c)+1;
+%             corAxisLU(c) = corAxisLU(c)+1;
+%         elseif x(t,c,2) == 2
+%             corAxisUD(c) = corAxisUD(c)+1;
+%         elseif x(t,c,2) == 1
+%             corAxisLU(c) = corAxisLU(c)+1;
+%         elseif x(t,c,2) == 3
+%             corAxisRU(c) = corAxisRU(c)+1;
+%         end
+% 
+%         if x(t,c,3) == 1 % LEFT
+%             corLeft(c) = corLeft(c)+1;
+%             corAxisLR(c) = corAxisLR(c)+1;
+%             corAxisLU(c) = corAxisLU(c)+1;
+%             corAxisLD(c) = corAxisLD(c)+1;
+%         elseif x(t,c,3) == 3
+%             corAxisLR(c) = corAxisLR(c)+1;
+%         elseif x(t,c,3) == 5
+%             corAxisLU(c) = corAxisLU(c)+1;
+%         elseif x(t,c,3) == 2
+%             corAxisLD(c) = corAxisLD(c)+1;
+%         end
+% 
+%         if x(t,c,4) == 2 % DOWN
+%             corDown(c) = corDown(c)+1;
+%             corAxisUD(c) = corAxisUD(c)+1;
+%             corAxisLD(c) = corAxisLD(c)+1;
+%             corAxisRD(c) = corAxisRD(c)+1;
+%         elseif x(t,c,4) == 5
+%             corAxisUD(c) = corAxisUD(c)+1;
+%         elseif x(t,c,4) == 1
+%             corAxisLD(c) = corAxisLD(c)+1;
+%         elseif x(t,c,4) == 3
+%             corAxisRD(c) = corAxisRD(c)+1;
+%         end
+% 
+%         for d = 1:4
+%             if isnan(x(t,c,d))
+%                 numNans(d,c) = numNans(d,c)+1;
+%             end
+%         end
+%     else
+
+%   PERCENT CORRECT PER DIRECTION/AXIS
+%     if strcmp(direction,'cardinal')
+%         percRight = corRight./(ones(1,numShift)*numTrials-numNans(1,:));
+%         percUp = corUp./(ones(1,numShift)*numTrials-numNans(2,:));
+%         percLeft = corLeft./(ones(1,numShift)*numTrials-numNans(3,:));
+%         percDown = corDown./(ones(1,numShift)*numTrials-numNans(4,:));
+% 
+%         percIndiv(1,:) = percRight;
+%         percIndiv(2,:) = percUp;
+%         percIndiv(3,:) = percLeft;
+%         percIndiv(4,:) = percDown;
+% 
+%         percUD = corAxisUD./(ones(1,numShift)*numTrials*2-(numNans(2,:)+numNans(4,:)));
+%         percLR = corAxisLR./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(3,:)));
+%         percRU = corAxisRU./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(2,:)));
+%         percRD = corAxisRD./(ones(1,numShift)*numTrials*2-(numNans(1,:)+numNans(4,:)));
+%         percLU = corAxisLU./(ones(1,numShift)*numTrials*2-(numNans(3,:)+numNans(2,:)));
+%         percLD = corAxisLD./(ones(1,numShift)*numTrials*2-(numNans(3,:)+numNans(4,:)));
+% 
+%         avgCorrectDir = (percRight+percUp+percLeft+percDown)/4;
+%         avgCorrectAxis = (percUD+percLR)/2;
+%         avgCorrectL1 = (percRU+percLD)/2;
+%         avgCorrectL2 = (percLU+percRD)/2;
+%         
+%         avgCorrectPairs = [avgCorrectAxis; avgCorrectL1; avgCorrectL2];
+%         avgCorrectLabels = {'+','Q1Q3','Q2Q4'};
+%         
+%         indivPairings = [percUD;percLR;percRU;percRD;percLU;percLD];
+%         indivPairingsLabels = {'UD','LR','RU','RD','LU','LD'};
